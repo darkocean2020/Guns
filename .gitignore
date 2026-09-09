@@ -1,3 +1,11 @@
 assets/*.blend1
 assets/*.blend2
 optix7cache.db*
+
+.npm-cache/
+harbor-game/node_modules/
+harbor-game/dist/
+harbor-game/.vinext/
+harbor-game/.wrangler/
+assets/harbor/*.blend1
+assets/harbor/*.blend2

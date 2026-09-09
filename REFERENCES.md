@@ -10,3 +10,9 @@
 - 摄影棚环境：[Poly Haven Studio Small 09](https://polyhaven.com/a/studio_small_09)，Sergej Majboroda，CC0。用于 Blender 世界环境与游戏 PBR 反射。
 
 2K 颜色、粗糙度、法线材质贴图由 `assets/make_pbr.py` 原创生成。此项目是外观游戏资产，不包含内部机械结构、制造规格或尺寸验证。模型仍需依据多视角照片继续人工校形才能达到扫描级或商业英雄资产级精度。
+
+## 东京港区场景
+- 东京团地仓库历史图集：https://www.danchisoko.co.jp/ayumi_50th/gallery.php （仓库/港区布局视觉参考）
+- 东京台场港口照片：https://commons.wikimedia.org/wiki/File:Tokyo-Odaiba.jpg （集装箱、吊机和水岸配色参考）
+- 新港口模型与鸟类角色由 Blender 程序化原创制作；未将参考照片作为游戏素材打包。
+
