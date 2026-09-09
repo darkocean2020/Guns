@@ -125,8 +125,14 @@ const beforeSprint = walking.player.x;
 walking.update(0.05, { x: 1, z: 0, sprint: true });
 assert(walking.player.x - beforeSprint > walkDistance, 'open backpack permits sprinting');
 assert(walking.inventory, 'movement keeps backpack open');
+const ammoBeforeShot = walking.ammo;
+assert(walking.shoot({ x: walking.player.x, z: walking.player.z - 8 }), 'open backpack permits firing');
+assert.equal(walking.ammo, ammoBeforeShot - 1, 'backpack shot consumes ammunition');
+assert(walking.inventory, 'firing keeps backpack open');
 const beforePause = { ...walking.player };
 walking.mode = 'paused';
+walking.shotCooldown = 0;
+assert.equal(walking.shoot({ x: walking.player.x, z: walking.player.z - 8 }), false, 'pause still blocks firing');
 walking.update(0.05, { x: 1, z: 0, sprint: true });
 assert.deepEqual(walking.player, beforePause, 'actual pause still stops movement');
 const g = await new GLTFLoader().parseAsync(

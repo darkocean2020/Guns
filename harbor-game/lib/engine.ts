@@ -100,6 +100,7 @@ export class Engine {
     window.addEventListener('blur', this.blur);
     this.renderer.domElement.addEventListener('pointermove', this.pointermove);
     this.renderer.domElement.addEventListener('pointerdown', this.pointerdown);
+    this.renderer.domElement.addEventListener('pointerleave', this.pointerup);
     window.addEventListener('pointerup', this.pointerup);
     this.frame = requestAnimationFrame(this.loop);
   }
@@ -737,6 +738,7 @@ export class Engine {
     window.removeEventListener('keyup', this.keyup);
     window.removeEventListener('blur', this.blur);
     window.removeEventListener('pointerup', this.pointerup);
+    this.renderer.domElement.removeEventListener('pointerleave', this.pointerup);
     this.renderer.domElement.removeEventListener(
       'pointermove',
       this.pointermove,

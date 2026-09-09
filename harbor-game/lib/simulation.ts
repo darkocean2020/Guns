@@ -843,7 +843,6 @@ export class Raid {
       this.reloadLeft > 0 ||
       this.healLeft > 0 ||
       this.openLoot ||
-      this.inventory ||
       this.mapOpen
     )
       return false;
