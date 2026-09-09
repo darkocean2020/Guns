@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CombatEffects, weaponFeel } from './combat-effects';
 import { ConstructionView } from './construction-view';
+import { BackgroundMusic } from './background-music';
 import { Raid, type Level, type Profile, type FX } from './simulation';
 export class Engine {
   renderer: T.WebGLRenderer;
@@ -17,6 +18,9 @@ export class Engine {
   target = new T.Vector3();
   mouse = false;
   muted = false;
+  musicEnabled = true;
+  music: BackgroundMusic | null = null;
+  musicDuckUntil = 0;
   ready = false;
   disposed = false;
   frame = 0;
@@ -334,6 +338,10 @@ export class Engine {
     this.muted = value;
     this.unlockAudio();
   }
+  setMusicEnabled(value: boolean) {
+    this.musicEnabled = value;
+    this.unlockAudio();
+  }
   unlockAudio() {
     if (!this.audio) {
       this.audio = new AudioContext();
@@ -350,6 +358,7 @@ export class Engine {
       );
       const data = this.noise.getChannelData(0);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      this.music = new BackgroundMusic(this.audio);
     }
     void this.audio.resume();
   }
@@ -366,6 +375,7 @@ export class Engine {
       now = ctx.currentTime,
       shot = e.type === 'shot' || e.type === 'enemy-shot';
     const enemy = e.type === 'enemy-shot';
+    if (shot) this.musicDuckUntil = ctx.currentTime + 1.8;
     const feel =
       weaponFeel[enemy ? 'glock' : this.raid.gun.id] ?? weaponFeel.glock;
     const spatial = enemy
@@ -507,6 +517,7 @@ export class Engine {
     this.mouse = false;
   };
   blur = () => {
+    this.music?.update(false, false);
     this.keys.clear();
     this.mouse = false;
     if (this.raid?.mode === 'raid') {
@@ -581,6 +592,10 @@ export class Engine {
     this.last = now;
     const r = this.raid;
     this.camera.position.sub(this.cameraShake);
+    this.music?.update(
+      this.musicEnabled && !this.muted && r?.mode !== 'paused' && document.hasFocus(),
+      (this.audio?.currentTime ?? 0) < this.musicDuckUntil,
+    );
     this.cameraShake.set(0, 0, 0);
     if (r) {
       this.aim();
@@ -736,6 +751,7 @@ export class Engine {
     });
     this.renderer.dispose();
     this.renderer.domElement.remove();
+    this.music?.dispose();
     void this.audio?.close();
   }
 }

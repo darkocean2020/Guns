@@ -12,7 +12,7 @@
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint app lib tests components/game",
     "format": "oxfmt",
-    "test": "node tests/simulation.test.mjs && node tests/assets.test.mjs && node tests/combat.test.mjs && node tests/inventory.test.mjs && node tests/construction.test.mjs"
+    "test": "node tests/simulation.test.mjs && node tests/assets.test.mjs && node tests/combat.test.mjs && node tests/inventory.test.mjs && node tests/construction.test.mjs && node tests/music.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

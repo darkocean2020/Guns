@@ -8,6 +8,7 @@ import {
   Shield,
   Volume2,
   VolumeX,
+  Music2,
   Pause,
   MapPin,
   Crosshair,
@@ -97,6 +98,7 @@ function MapView({ raid, large = false }: { raid: Raid; large?: boolean }) {
   );
 }
 export default function Home() {
+  const [musicEnabled, setMusicEnabled] = useState(true);
   const host = useRef<HTMLDivElement>(null),
     [g, setEngine] = useState<Engine | null>(null);
   const [, render] = useState(0);
@@ -183,6 +185,19 @@ export default function Home() {
         <div className="top-actions">
           <span className="status-dot" />
           <span className="edition">单人搜打撤 · LOCAL SAVE</span>
+          <button
+            className="icon-button"
+            aria-label={musicEnabled ? '关闭背景音乐' : '打开背景音乐'}
+            aria-pressed={musicEnabled}
+            title={musicEnabled ? '背景音乐：开 · 点击关闭' : '背景音乐：关 · 点击打开'}
+            style={{ opacity: musicEnabled ? 1 : 0.4 }}
+            onClick={() => {
+              setMusicEnabled(!musicEnabled);
+              g?.setMusicEnabled(!musicEnabled);
+            }}
+          >
+            <Music2 size={18} />
+          </button>
           <button
             className="icon-button"
             aria-label={muted ? '打开声音' : '静音'}
