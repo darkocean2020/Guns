@@ -48,12 +48,14 @@ Glock 免费；其他武器收取押金，成功撤离返还。带回清单另�
 
 ## 网页托管
 
-已部署至 https://harbor-zero-tokyo.sound-peach-2753.chatgpt.site ，已允许任何持有游戏链接的人访问。GitHub 仓库继续私有。
+游戏分享地址：https://darkocean2020.github.io/Guns/ 。GitHub 仓库按用户最新要求保持公开，Pages 从 `gh-pages` 分支根目录发布。已验证部署成功，页面、脚本、样式、地图和模型资源可匿名访问。
+
+在 `harbor-game` 运行 `npm run build:pages` 生成 `dist-pages/`，把该目录内容与 `.nojekyll` 发布到 `gh-pages` 分支即可更新。此版本包含建造、自由交叠放置和 B 建造下方的 H 急救包提示。运行资源使用相对路径，支持 `/Guns/` 子目录。原有 Sites 部署保留为旧版。
 
 网页模型使用 `harbor-game/scripts/share_textures.py` 抽取共享贴图，不修改图像像素或几何。原始完整 GLB、Blender 源文件仍保留在 `assets/`。网站只包含运行所需资源，不包含 Blender 源文件。
 
 
-## 生存建造（本地新版）
+## 生存建造
 
 B 进入/退出建造，1 木墙 / 2 架高地板 / 3 楼梯，R 旋转 90°，左键放置，X 拆除指向的建筑并返还一半材料。绿色预览可放，红色显示受阻原因。建造吸附 3 米网格，距离上限 7 米，每局最多 40 个建筑。
 
