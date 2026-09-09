@@ -1,0 +1,37 @@
+[
+  {
+    "id": "ak47",
+    "objects": 66,
+    "file": "ak47.glb"
+  },
+  {
+    "id": "glock",
+    "objects": 119,
+    "file": "glock.glb"
+  },
+  {
+    "id": "kar98k",
+    "objects": 31,
+    "file": "kar98k.glb"
+  },
+  {
+    "id": "shotgun",
+    "objects": 45,
+    "file": "shotgun.glb"
+  },
+  {
+    "id": "ar15",
+    "objects": 91,
+    "file": "ar15.glb"
+  },
+  {
+    "id": "revolver",
+    "objects": 40,
+    "file": "revolver.glb"
+  },
+  {
+    "id": "1911",
+    "objects": 121,
+    "file": "1911.glb"
+  }
+]

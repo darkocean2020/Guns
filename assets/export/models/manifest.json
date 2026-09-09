@@ -1,0 +1,51 @@
+[
+  {
+    "id": "ak47",
+    "objects": 90,
+    "evaluated_faces": 114892,
+    "file": "ak47.glb",
+    "pbr": "2048px baseColor / roughness / tangent normal"
+  },
+  {
+    "id": "glock",
+    "objects": 585,
+    "evaluated_faces": 149869,
+    "file": "glock.glb",
+    "pbr": "2048px baseColor / roughness / tangent normal"
+  },
+  {
+    "id": "kar98k",
+    "objects": 44,
+    "evaluated_faces": 45096,
+    "file": "kar98k.glb",
+    "pbr": "2048px baseColor / roughness / tangent normal"
+  },
+  {
+    "id": "shotgun",
+    "objects": 59,
+    "evaluated_faces": 48011,
+    "file": "shotgun.glb",
+    "pbr": "2048px baseColor / roughness / tangent normal"
+  },
+  {
+    "id": "ar15",
+    "objects": 98,
+    "evaluated_faces": 50666,
+    "file": "ar15.glb",
+    "pbr": "2048px baseColor / roughness / tangent normal"
+  },
+  {
+    "id": "revolver",
+    "objects": 47,
+    "evaluated_faces": 34066,
+    "file": "revolver.glb",
+    "pbr": "2048px baseColor / roughness / tangent normal"
+  },
+  {
+    "id": "1911",
+    "objects": 83,
+    "evaluated_faces": 45972,
+    "file": "1911.glb",
+    "pbr": "2048px baseColor / roughness / tangent normal"
+  }
+]
