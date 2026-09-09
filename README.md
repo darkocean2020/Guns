@@ -48,6 +48,8 @@ Glock 免费；其他武器收取押金，成功撤离返还。带回清单另�
 
 ## 网页托管
 
+英文游戏页面：https://darkocean2020.github.io/Guns/en.html 。原 `/Guns/` 入口保持中文。两页共用模型及游戏逻辑，`npm run build:pages` 同时生成两页；英文翻译位于 `harbor-game/scripts/english.json`，漏译会使英文构建失败。两页共用同一浏览器的存档，存档物品名称按当前页面语言显示。
+
 游戏分享地址：https://darkocean2020.github.io/Guns/ 。GitHub 仓库按用户最新要求保持公开，Pages 从 `gh-pages` 分支根目录发布。已验证部署成功，页面、脚本、样式、地图和模型资源可匿名访问。
 
 在 `harbor-game` 运行 `npm run build:pages` 生成 `dist-pages/`，把该目录内容与 `.nojekyll` 发布到 `gh-pages` 分支即可更新。此版本包含建造、自由交叠放置和 B 建造下方的 H 急救包提示。运行资源使用相对路径，支持 `/Guns/` 子目录。原有 Sites 部署保留为旧版。

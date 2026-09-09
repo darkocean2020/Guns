@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CombatEffects, weaponFeel } from './combat-effects';
 import { ConstructionView } from './construction-view';
 import { BackgroundMusic } from './background-music';
-import { Raid, type Level, type Profile, type FX } from './simulation';
+import { Raid, catalog, type Level, type Profile, type FX } from './simulation';
 export class Engine {
   renderer: T.WebGLRenderer;
   scene = new T.Scene();
@@ -165,6 +165,11 @@ export class Engine {
       )
         profile = p;
     } catch {}
+    // Saved item labels follow the page language; item values and progress stay intact.
+    profile.stash = profile.stash.map((item) => {
+      const label = catalog.find((entry) => entry.id === item.id);
+      return label ? { ...item, name: label.name, category: label.category } : item;
+    });
     this.raid = new Raid(
       level as Level,
       profile,

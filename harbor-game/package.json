@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
-    "build:pages": "vite build --config vite.pages.config.ts",
+    "build:pages": "vite build --config vite.pages.config.ts && vite build --config vite.pages.config.ts --mode english && node scripts/merge-pages.mjs",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint app lib tests components/game",
     "format": "oxfmt",
