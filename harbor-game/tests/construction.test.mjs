@@ -9,16 +9,10 @@ const js = ts.transpileModule(fs.readFileSync('lib/simulation.ts', 'utf8'), {
     module: ts.ModuleKind.ES2022,
   },
 }).outputText;
-const {
-  Raid,
-  blueprints,
-  surfaceHeight,
-  segmentBlocked,
-  blocked,
-  findPath,
-} = await import(
-  'data:text/javascript;base64,' + Buffer.from(js).toString('base64')
-);
+const { Raid, blueprints, surfaceHeight, segmentBlocked, blocked, findPath } =
+  await import(
+    'data:text/javascript;base64,' + Buffer.from(js).toString('base64')
+  );
 const level = {
   bounds: { minX: -25, maxX: 25, minZ: -24, maxZ: 24 },
   spawn: { x: 0, z: 5 },
@@ -43,8 +37,10 @@ assert.equal(r.plan().z, 0);
 assert(r.placeBuild());
 assert.equal(r.wood, 30);
 assert.equal(r.scrap, 14);
-assert(!r.placeBuild(), 'overlap rejected');
-assert.equal(r.wood, 30);
+assert(r.placeBuild(), 'overlapping placement allowed');
+assert.equal(r.wood, 24);
+assert(r.demolish());
+assert.equal(r.wood, 27);
 assert(
   segmentBlocked(
     { x: 0, z: 4, y: 0 },
@@ -57,8 +53,8 @@ r.player = { x: 0, z: 0.5, y: 0 };
 assert(r.movePlayer(0, -0.3).z > 0.22, 'wall blocks walking');
 r.buildTarget = { x: 0, z: 0 };
 assert(r.demolish());
-assert.equal(r.wood, 33);
-assert.equal(r.scrap, 15);
+assert.equal(r.wood, 30);
+assert.equal(r.scrap, 14);
 assert.equal(r.buildings.length, 0);
 r.start('glock');
 r.resources = [];
@@ -188,3 +184,23 @@ console.log(
   'PASS: build cost, grid, collision, stairs in four rotations, platform access, support protection, salvage depletion, ray elevation, durability, pause/reset, model dimensions.',
 );
 
+const overlapRaid = new Raid(
+  {
+    ...level,
+    colliders: [{ x: 0, z: 0, w: 3, d: 3, h: 2, name: 'container' }],
+    loot: [{ id: 'crate-0', x: 0, z: 0, kind: 'supply' }],
+    enemies: [{ x: 0, z: 0 }],
+  },
+  { credits: 0, stash: [], raids: 0, extractions: 0 },
+);
+overlapRaid.start('glock');
+overlapRaid.player = { x: 0, z: 0, y: 0 };
+overlapRaid.resources = [{ id: 0, x: 0, z: 0, remaining: 3 }];
+overlapRaid.buildMode = true;
+overlapRaid.buildTarget = { x: 0, z: 0 };
+assert.equal(
+  overlapRaid.buildReason(),
+  '',
+  'scene, player, enemy, loot and resource overlap allowed',
+);
+assert(overlapRaid.placeBuild());

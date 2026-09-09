@@ -492,28 +492,6 @@ export class Raid {
       r.z + r.d / 2 > bounds.maxZ
     )
       return '超出码头范围';
-    const overlap = (a: Rect, b: Rect) =>
-      Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 0.02 &&
-      Math.abs(a.z - b.z) < (a.d + b.d) / 2 - 0.02;
-    if (this.level.colliders.some((c) => overlap(r, c)))
-      return '与港区设施重叠';
-    if (
-      this.buildings.some(
-        (b) =>
-          overlap(r, buildRect(b)) &&
-          !(plan.kind === 'wall' && b.kind === 'floor'),
-      )
-    )
-      return '与现有建筑重叠';
-    if (this.loot.some((c) => c.items.length && inRect(c, r, 0.8)))
-      return '请避开物资箱';
-    if (this.resources.some((p) => p.remaining > 0 && inRect(p, r, 0.65)))
-      return '请避开材料堆';
-    if (
-      inRect(this.player, r, 0.5) ||
-      this.enemies.some((e) => e.hp > 0 && inRect(e, r, 0.5))
-    )
-      return '位置被角色占用';
     const cost = blueprints[plan.kind];
     if (this.wood < cost.wood || this.scrap < cost.scrap)
       return '木料或废金属不足';
