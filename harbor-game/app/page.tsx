@@ -24,6 +24,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Engine } from '@/lib/engine';
+import { InventoryPanel } from '@/components/game/inventory-panel';
 import { registerHarborTools } from '@/lib/webmcp';
 import { guns, distance, type Raid } from '@/lib/simulation';
 const money = (n: number) => '¥ ' + n.toLocaleString('en-US');
@@ -225,7 +226,9 @@ export default function Home() {
             </div>
             <div className="loadout-note">
               <Shield size={15} />
-              <span>防弹背心 · 2 份急救包 · {gun.mag * 6} 发弹药</span>
+              <span>
+                防弹背心 · 2 格安全箱 · 2 份急救包 · {gun.mag * 6} 发弹药
+              </span>
             </div>
             <button
               className="deploy-button"
@@ -247,7 +250,8 @@ export default function Home() {
               <ArrowUpRight size={25} />
             </button>
             <p className="risk-note">
-              装备押金 {money(gun.cost)}，撤离返还。阵亡丢失本局物资。
+              装备押金 {money(gun.cost)}
+              ，撤离返还。阵亡丢失背包物资，安全箱内物品保留。
             </p>
           </section>
           <aside className="briefing">
@@ -372,7 +376,7 @@ export default function Home() {
                 .padStart(2, '0')}
             </div>
             <span>
-              {r.bag.some((i) => i.id === 'manifest')
+              {r.hasManifest
                 ? '✓ 清单已取得，前往撤离'
                 : '搜索北侧海关 · 取得货运清单'}
             </span>
@@ -409,7 +413,10 @@ export default function Home() {
           <div className="bag-status">
             <Backpack size={18} />
             <span>{r.weight} / 12 kg</span>
-            <b>{money(r.value)}</b>
+            <span title="安全箱：死亡保留">
+              <Shield size={13} /> {r.secure.length}/2
+            </span>
+            <b>{money(r.value + r.secureValue)}</b>
             <button
               onClick={() =>
                 action(() => {
@@ -451,63 +458,7 @@ export default function Home() {
             Shift 冲刺 <span>·</span> H 治疗 <span>·</span> Esc 暂停
           </div>
           {(r.openLoot || r.inventory) && (
-            <aside className="loot-panel">
-              <div className="section-label">
-                <span>{r.openLoot ? '搜索结果' : '随身背包'}</span>
-                <button
-                  aria-label="关闭物品栏"
-                  onClick={() =>
-                    action(() => {
-                      r.openLoot = null;
-                      r.inventory = false;
-                    })
-                  }
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <h2>{r.openLoot ? '拿走值得带回的。' : '每一格都很重要。'}</h2>
-              <p>负重 {r.weight} / 12 kg · 搜刮时战斗仍在继续</p>
-              <div className="item-list">
-                {(r.openLoot
-                  ? (r.loot.find((c) => c.id === r.openLoot)?.items ?? [])
-                  : r.bag
-                ).map((item, i) => (
-                  <button
-                    className={'item ' + item.rarity}
-                    key={i}
-                    onClick={() =>
-                      action(() => {
-                        if (r.openLoot) r.take(i);
-                        else r.drop(i);
-                      })
-                    }
-                  >
-                    <Package size={22} />
-                    <span>
-                      {item.name}
-                      <small>
-                        {item.category} · {item.weight} kg
-                      </small>
-                    </span>
-                    <span>
-                      {money(item.value)}
-                      <small>{r.openLoot ? '拾取 ＋' : '丢弃 ×'}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {r.openLoot ? (
-                <button
-                  className="primary"
-                  onClick={() => action(() => r.takeAll())}
-                >
-                  全部拾取 <ArrowRight size={16} />
-                </button>
-              ) : (
-                <p>成功撤离后，背包物品自动进入安全仓库。</p>
-              )}
-            </aside>
+            <InventoryPanel raid={r} refresh={refresh} />
           )}
           {r.mapOpen && (
             <aside className="full-map">
@@ -553,8 +504,8 @@ export default function Home() {
                   : r.result === 'extracted'
                     ? '所有随身物资已转入安全仓库，装备押金已返还。'
                     : r.result === 'timeout'
-                      ? '最后一班船已离开，本局随身物资丢失。'
-                      : '行动失败，本局随身物资丢失。安全仓库不受影响。'}
+                      ? '最后一班船已离开，背包物资丢失；安全箱内物品已带回仓库。'
+                      : '行动失败，背包物资丢失；安全箱内物品已带回仓库。'}
               </DialogDescription>
               {r.mode === 'result' && (
                 <>
@@ -565,6 +516,15 @@ export default function Home() {
                       <Skull size={42} />
                     )}
                   </div>
+                  <div className="secured-result">
+                    <Shield size={18} />
+                    <span>
+                      安全箱保留{' '}
+                      <b>
+                        {r.secure.length} 件 · {money(r.secureValue)}
+                      </b>
+                    </span>
+                  </div>
                   <div className="result-stats">
                     <div>
                       <small>击败敌人</small>
@@ -574,7 +534,13 @@ export default function Home() {
                       <small>
                         {r.result === 'extracted' ? '带回价值' : '损失物资'}
                       </small>
-                      <b>{money(r.value)}</b>
+                      <b>
+                        {money(
+                          r.result === 'extracted'
+                            ? r.value + r.secureValue
+                            : r.value,
+                        )}
+                      </b>
                     </div>
                     <div>
                       <small>委托报酬</small>
@@ -605,7 +571,7 @@ export default function Home() {
                     })
                   }
                 >
-                  放弃行动（丢失本局物资）
+                  放弃行动（仅保留安全箱）
                 </button>
               )}
             </DialogContent>

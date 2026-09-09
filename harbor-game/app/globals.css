@@ -982,3 +982,321 @@ kbd {
   text-shadow: 0 2px 5px #000;
   opacity: 0;
 }
+.inventory-panel {
+  position: absolute;
+  right: 22px;
+  top: 80px;
+  bottom: 115px;
+  width: 420px;
+  padding: 20px;
+  background: #10262df5;
+  border: 1px solid #bad6c83b;
+  backdrop-filter: blur(18px);
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #496258 #12272b;
+  z-index: 5;
+}
+.inventory-panel.with-loot {
+  width: 615px;
+}
+.inventory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.inventory-header h2 {
+  font-size: 22px;
+  margin-top: 8px;
+}
+.inventory-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10px;
+  color: #9eb4ad;
+  padding: 15px 0;
+  border-bottom: 1px solid #adcabc22;
+  margin-bottom: 16px;
+}
+.inventory-summary > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.inventory-summary b {
+  font-weight: 400;
+  color: #e3c18f;
+}
+.inventory-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+.with-loot .inventory-columns {
+  grid-template-columns: 175px 1fr;
+}
+.grid-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #c3d2c8;
+  margin-bottom: 10px;
+}
+.grid-heading b {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  color: #8fa59d;
+}
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.inventory-grid.loot {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.inventory-slot {
+  height: 83px;
+  position: relative;
+  background: #1d343ad4;
+  border: 1px solid #abc8bc29;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 2px 7px;
+  min-width: 0;
+  user-select: none;
+}
+.inventory-slot > svg {
+  color: #d1dccc;
+}
+.inventory-slot.rare {
+  background: linear-gradient(145deg, #30525b85, #172f36);
+  border-bottom: 2px solid #7bb1c0;
+}
+.inventory-slot.epic {
+  background: linear-gradient(145deg, #59436385, #172f36);
+  border-bottom: 2px solid #c394df;
+}
+.inventory-slot strong {
+  font-size: 9px;
+  font-weight: 400;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #dce4da;
+}
+.inventory-slot small {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 8px;
+  color: #96aaa1;
+}
+.inventory-slot .slot-number {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  font-size: 8px;
+  color: #708880;
+}
+.inventory-slot.empty {
+  background: linear-gradient(135deg, #b8cbbb05, transparent);
+  border-style: dashed;
+}
+.inventory-slot.empty > svg {
+  color: #526e6255;
+}
+.empty-label {
+  color: #668175;
+  font-size: 8px;
+}
+.inventory-slot.chosen {
+  outline: 1px solid #f1c28d;
+  outline-offset: 1px;
+  background-color: #514534;
+}
+.inventory-slot.drag-over {
+  outline: 2px solid #9ce8bd;
+  background: #446957;
+}
+.inventory-slot[draggable='true'] {
+  cursor: grab;
+}
+.inventory-slot:active[draggable='true'] {
+  cursor: grabbing;
+}
+.secure-section {
+  margin-top: 18px;
+  border-top: 1px solid #85cfa32a;
+  padding-top: 14px;
+}
+.secure-section .grid-heading,
+.secure-section .grid-heading b {
+  color: #a5d7b7;
+}
+.secure-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: center;
+}
+.secure-content .inventory-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.secure .inventory-slot {
+  border-color: #8cd6a655;
+  background-color: #233d31;
+}
+.secure .inventory-slot.empty {
+  background: #1d382b77;
+}
+.secure-content > p {
+  color: #8cae98;
+  font-size: 9px;
+  line-height: 1.8;
+}
+.secure-content > p > svg {
+  float: left;
+  margin: 2px 7px 22px 0;
+  color: #a6d5b2;
+}
+.secure-content > p strong {
+  display: block;
+  color: #badbc4;
+  font-size: 11px;
+  font-weight: 400;
+}
+.slot-lock {
+  position: absolute;
+  bottom: 5px;
+  right: 4px;
+  color: #b1e0be !important;
+}
+.inventory-take-all {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #dec095;
+  color: #182d2e;
+  font-size: 11px;
+  padding: 12px;
+  margin-top: 12px;
+}
+.inventory-tip {
+  font-size: 10px;
+  line-height: 1.9;
+  color: #8ea69a;
+}
+.loot-grid-section > .inventory-tip {
+  margin-top: 13px;
+}
+.inventory-details {
+  margin-top: 18px;
+  border-top: 1px solid #a4c3ae2c;
+  padding-top: 14px;
+  min-height: 80px;
+}
+.selected-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.selected-item > svg {
+  color: #debd91;
+}
+.selected-item strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+}
+.selected-item span {
+  display: block;
+  font-size: 9px;
+  color: #8fa99a;
+  margin-top: 6px;
+}
+.selected-item .protected-badge {
+  margin-left: auto;
+  color: #b4debd;
+  border: 1px solid #8bd6a43f;
+  padding: 4px 7px;
+  font-size: 9px;
+}
+.inventory-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.inventory-actions button {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #bad1bf38;
+  background: #243c38;
+  font-size: 11px;
+}
+.inventory-actions button.protect {
+  border-color: #93cf9c65;
+  color: #bbe0be;
+}
+.inventory-actions button.discard {
+  margin-left: auto;
+  background: none;
+  color: #ad9f91;
+}
+.secured-result {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: #31554233;
+  padding: 13px;
+  color: #acd8b7;
+  font-size: 11px;
+}
+.secured-result b {
+  font-weight: 400;
+  margin-left: 14px;
+}
+@media (max-width: 850px) {
+  .inventory-panel.with-loot {
+    width: 570px;
+  }
+  .with-loot .inventory-columns {
+    grid-template-columns: 160px 1fr;
+  }
+  .inventory-panel {
+    right: 15px;
+    padding: 16px;
+  }
+}
+@media (max-height: 800px) {
+  .inventory-panel {
+    top: 70px;
+    bottom: 75px;
+  }
+  .inventory-slot {
+    height: 74px;
+  }
+  .inventory-summary {
+    padding: 12px 0;
+    margin-bottom: 12px;
+  }
+  .secure-section {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+}
+.bag-status > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}

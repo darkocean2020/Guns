@@ -46,6 +46,7 @@ export function registerHarborTools(game: Engine) {
           credits: r.profile.credits,
           stash: r.profile.stash,
           bag: r.bag,
+          secure: r.secure,
         };
       },
     },

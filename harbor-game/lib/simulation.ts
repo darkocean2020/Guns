@@ -319,6 +319,7 @@ export class Raid {
   elapsed = 0;
   kills = 0;
   bag: Item[] = [];
+  secure: Item[] = [];
   enemies: Enemy[] = [];
   loot: Loot[] = [];
   openLoot: string | null = null;
@@ -344,10 +345,16 @@ export class Raid {
     this.player = { ...level.spawn };
   }
   get weight() {
-    return this.bag.reduce((sum, i) => sum + i.weight, 0);
+    return [...this.bag, ...this.secure].reduce((sum, i) => sum + i.weight, 0);
   }
   get value() {
     return this.bag.reduce((sum, i) => sum + i.value, 0);
+  }
+  get secureValue() {
+    return this.secure.reduce((sum, i) => sum + i.value, 0);
+  }
+  get hasManifest() {
+    return [...this.bag, ...this.secure].some((i) => i.id === 'manifest');
   }
   get nearby() {
     return this.loot
@@ -389,6 +396,7 @@ export class Raid {
     this.elapsed = 0;
     this.kills = 0;
     this.bag = [];
+    this.secure = [];
     this.openLoot = null;
     this.inventory = false;
     this.mapOpen = false;
@@ -431,6 +439,10 @@ export class Raid {
     this.notify('已进入大井码头。海关清单位于北侧仓库。');
     return true;
   }
+  closeInventory() {
+    this.openLoot = null;
+    this.inventory = false;
+  }
   togglePause() {
     if (this.mode === 'raid') this.mode = 'paused';
     else if (this.mode === 'paused') this.mode = 'raid';
@@ -455,18 +467,30 @@ export class Raid {
     if (c.searched) this.openLoot = c.id;
     else this.search = { id: c.id, progress: 0 };
   }
-  take(index: number) {
+  take(index: number, destination: 'bag' | 'secure' = 'bag') {
+    if (this.mode !== 'raid' || !Number.isInteger(index) || index < 0)
+      return false;
     const c = this.loot.find((c) => c.id === this.openLoot);
     const item = c?.items[index];
     if (!item) return false;
+    const container = destination === 'secure' ? this.secure : this.bag;
+    if (container.length >= (destination === 'secure' ? 2 : 12)) {
+      this.notify(
+        destination === 'secure' ? '安全箱已满（2 格）' : '背包格子已满',
+      );
+      return false;
+    }
     if (this.weight + item.weight > 12) {
       this.notify('背包负重已满，可丢弃物品腾出空间');
       return false;
     }
-    this.bag.push(item);
+    container.push(item);
     c!.items.splice(index, 1);
     this.fx({ type: 'loot', from: this.player });
-    if (!c!.items.length) this.openLoot = null;
+    if (!c!.items.length) {
+      this.openLoot = null;
+      this.inventory = true;
+    }
     return true;
   }
   takeAll() {
@@ -474,8 +498,49 @@ export class Raid {
     if (!c) return;
     for (let i = c.items.length - 1; i >= 0; i--) this.take(i);
   }
-  drop(index: number) {
-    if (this.mode === 'raid') this.bag.splice(index, 1);
+  transfer(
+    index: number,
+    source: 'bag' | 'secure',
+    destination: 'bag' | 'secure',
+    targetIndex?: number,
+  ) {
+    if (this.mode !== 'raid' || !Number.isInteger(index) || index < 0)
+      return false;
+    const from = source === 'bag' ? this.bag : this.secure,
+      to = destination === 'bag' ? this.bag : this.secure;
+    const item = from[index];
+    if (!item) return false;
+    const target =
+      targetIndex === undefined
+        ? to.length
+        : Math.min(Math.max(0, targetIndex), to.length);
+    if (!Number.isInteger(target)) return false;
+    if (from === to) {
+      from.splice(index, 1);
+      from.splice(Math.min(target, from.length), 0, item);
+      return true;
+    }
+    if (to.length >= (destination === 'secure' ? 2 : 12)) {
+      if (targetIndex === undefined || !to[target]) {
+        this.notify(
+          destination === 'secure' ? '安全箱已满（2 格）' : '背包格子已满',
+        );
+        return false;
+      }
+      from[index] = to[target];
+      to[target] = item;
+    } else {
+      from.splice(index, 1);
+      to.splice(target, 0, item);
+    }
+    this.notify(
+      destination === 'secure' ? '已放入安全箱，死亡后仍保留' : '已移回背包',
+    );
+    return true;
+  }
+  drop(index: number, source: 'bag' | 'secure' = 'bag') {
+    if (this.mode === 'raid' && Number.isInteger(index) && index >= 0)
+      (source === 'secure' ? this.secure : this.bag).splice(index, 1);
   }
   reload() {
     if (
@@ -641,10 +706,11 @@ export class Raid {
     this.search = null;
     this.extracting = false;
     this.profile.raids++;
+    this.profile.stash.push(...this.secure.map((i) => ({ ...i })));
     if (result === 'extracted') {
       this.profile.extractions++;
       this.profile.stash.push(...this.bag);
-      this.questReward = this.bag.some((i) => i.id === 'manifest') ? 2500 : 0;
+      this.questReward = this.hasManifest ? 2500 : 0;
       this.profile.credits += this.gun.cost + this.questReward;
     }
     this.persist(this.profile);

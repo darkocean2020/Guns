@@ -9,9 +9,9 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
-    "lint": "oxlint app lib tests",
+    "lint": "oxlint app lib tests components/game",
     "format": "oxfmt",
-    "test": "node tests/simulation.test.mjs && node tests/assets.test.mjs && node tests/combat.test.mjs"
+    "test": "node tests/simulation.test.mjs && node tests/assets.test.mjs && node tests/combat.test.mjs && node tests/inventory.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

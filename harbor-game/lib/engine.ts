@@ -33,6 +33,8 @@ export class Engine {
   audioBus: DynamicsCompressorNode | null = null;
   noise: AudioBuffer | null = null;
   markers = new Map<string, T.Mesh>();
+  deathCrates = new Map<string, T.Group>();
+  crateModel!: T.Group;
   audio: AudioContext | null = null;
   resizeObserver: ResizeObserver;
   water!: T.Mesh;
@@ -96,14 +98,23 @@ export class Engine {
   }
   async load() {
     this.progress('读取港区地形');
-    const [map, bird, level] = await Promise.all([
+    const [map, bird, level, crate] = await Promise.all([
       this.loader.loadAsync('/world/harbor.glb'),
       this.loader.loadAsync('/world/scavenger.glb'),
       fetch('/world/level.json').then((r) => r.json() as Promise<Level>),
+      this.loader.loadAsync('/world/military-crate.glb'),
     ]);
     if (this.disposed) return;
     this.batch(map.scene);
     this.character = bird.scene;
+    this.crateModel = new T.Group();
+    this.batch(crate.scene, this.crateModel);
+    this.crateModel.traverse((o) => {
+      if (o instanceof T.Mesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+      }
+    });
     this.player = bird.scene.clone(true);
     this.player.add(this.held);
     const halo = new T.Mesh(
@@ -202,14 +213,14 @@ export class Engine {
     this.progress('');
     this.refresh();
   }
-  batch(root: T.Group) {
+  batch(root: T.Group, target: T.Object3D = this.scene) {
     root.updateMatrixWorld(true);
     const groups = new Map<T.Material, T.BufferGeometry[]>();
     root.traverse((o) => {
       if (!(o instanceof T.Mesh)) return;
       const materials = Array.isArray(o.material) ? o.material : [o.material];
       if (materials.length !== 1) {
-        this.scene.add(o.clone());
+        target.add(o.clone());
         return;
       }
       const g = o.geometry.clone().applyMatrix4(o.matrixWorld);
@@ -235,7 +246,7 @@ export class Engine {
         const mesh = new T.Mesh(geom, mat);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-        this.scene.add(mesh);
+        target.add(mesh);
       }
       for (const g of geoms) g.dispose();
     }
@@ -299,6 +310,8 @@ export class Engine {
     });
     for (const m of this.markers.values()) this.scene.remove(m);
     this.markers.clear();
+    for (const box of this.deathCrates.values()) this.scene.remove(box);
+    this.deathCrates.clear();
     this.refresh();
   }
   menu() {
@@ -571,7 +584,8 @@ export class Engine {
         if (!e) return;
         bird.position.set(e.x, e.hp > 0 ? 0 : 0.15, e.z);
         bird.rotation.set(e.hp > 0 ? 0 : Math.PI / 2, -e.angle, 0);
-        bird.visible = r.mode !== 'menu';
+        bird.visible =
+          r.mode !== 'menu' && (e.hp > 0 || r.elapsed - e.deathTime < 0.3);
         const flash = this.combat.flashEnemies.has(e.id);
         bird.traverse((o) => {
           if (
@@ -589,6 +603,17 @@ export class Engine {
         });
       });
       for (const c of r.loot) {
+        if (c.kind === 'enemy') {
+          let box = this.deathCrates.get(c.id);
+          if (!box) {
+            box = this.crateModel.clone(true);
+            box.position.set(c.x, 0.04, c.z);
+            box.rotation.y = 0.25;
+            this.deathCrates.set(c.id, box);
+            this.scene.add(box);
+          }
+          box.visible = r.mode !== 'menu';
+        }
         let marker = this.markers.get(c.id);
         if (!marker) {
           marker = new T.Mesh(
@@ -601,7 +626,11 @@ export class Engine {
           this.scene.add(marker);
         }
         marker.visible = c.items.length > 0 && r.mode !== 'menu';
-        marker.position.set(c.x, 1.4 + Math.sin(now * 0.002) * 0.12, c.z);
+        marker.position.set(
+          c.x,
+          (c.kind === 'enemy' ? 1.1 : 1.4) + Math.sin(now * 0.002) * 0.12,
+          c.z,
+        );
         marker.rotation.y = now * 0.001;
       }
       const menu = r.mode === 'menu';
