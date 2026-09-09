@@ -24,7 +24,7 @@ export class ConstructionView {
   ) {
     await Promise.all(
       ['wall', 'floor', 'stairs', 'resources'].map(async (kind) => {
-        const gltf = await loader.loadAsync('/world/build-' + kind + '.glb');
+        const gltf = await loader.loadAsync('./world/build-' + kind + '.glb');
         const root = new T.Group();
         batch(gltf.scene, root);
         this.models.set(kind, root);

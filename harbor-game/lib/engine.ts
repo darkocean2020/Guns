@@ -102,10 +102,10 @@ export class Engine {
   async load() {
     this.progress('读取港区地形');
     const [map, bird, level, crate] = await Promise.all([
-      this.loader.loadAsync('/world/harbor.glb'),
-      this.loader.loadAsync('/world/scavenger.glb'),
-      fetch('/world/level.json').then((r) => r.json() as Promise<Level>),
-      this.loader.loadAsync('/world/military-crate.glb'),
+      this.loader.loadAsync('./world/harbor.glb'),
+      this.loader.loadAsync('./world/scavenger.glb'),
+      fetch('./world/level.json').then((r) => r.json() as Promise<Level>),
+      this.loader.loadAsync('./world/military-crate.glb'),
     ]);
     if (this.disposed) return;
     this.batch(map.scene);
@@ -263,7 +263,7 @@ export class Engine {
     const token = ++this.gunRequest;
     this.selected = id;
     if (!this.gunCache.has(id)) {
-      const gltf = await this.loader.loadAsync(`/weapons/${id}.glb`);
+      const gltf = await this.loader.loadAsync(`./weapons/${id}.glb`);
       if (this.disposed) return;
       const model = gltf.scene;
       const box = new T.Box3().setFromObject(model);
