@@ -195,9 +195,13 @@ export type Loot = Point & {
   searched: boolean;
 };
 export type FX = {
-  type: 'shot' | 'enemy-shot' | 'hit' | 'death' | 'heal' | 'loot';
+  type: 'shot' | 'enemy-shot' | 'hit' | 'death' | 'heal' | 'loot' | 'impact';
   from: Point;
   to?: Point;
+  primary?: boolean;
+  enemyId?: number;
+  damage?: number;
+  surface?: string;
 };
 export const distance = (a: Point, b: Point) =>
   Math.hypot(a.x - b.x, a.z - b.z);
@@ -547,18 +551,58 @@ export class Raid {
           nearest = along;
         }
       }
-      const dest = hit ? { x: hit.x, z: hit.z } : end;
-      this.fx({ type: 'shot', from: { ...this.player }, to: dest });
+      let dest = hit ? { x: hit.x, z: hit.z } : end;
+      const wall =
+        !hit && segmentBlocked(this.player, end, this.level.colliders);
+      if (wall) {
+        let near = 0,
+          far = 1;
+        for (let step = 0; step < 16; step++) {
+          const t = (near + far) / 2;
+          const point = {
+            x: this.player.x + (end.x - this.player.x) * t,
+            z: this.player.z + (end.z - this.player.z) * t,
+          };
+          if (segmentBlocked(this.player, point, this.level.colliders)) far = t;
+          else near = t;
+        }
+        dest = {
+          x: this.player.x + (end.x - this.player.x) * far,
+          z: this.player.z + (end.z - this.player.z) * far,
+        };
+      }
+      this.fx({
+        type: 'shot',
+        from: { ...this.player },
+        to: dest,
+        primary: i === 0,
+      });
+      if (wall)
+        this.fx({
+          type: 'impact',
+          from: dest,
+          surface: this.level.colliders.find((r) => inRect(dest, r, 0.01))
+            ?.name,
+        });
       if (hit) {
         hit.hp -= this.gun.damage;
         hit.alert = true;
         hit.lastSeen = { ...this.player };
         hit.memory = 8;
-        this.fx({ type: 'hit', from: hit });
+        this.fx({
+          type: 'hit',
+          from: { x: hit.x, z: hit.z },
+          enemyId: hit.id,
+          damage: Math.min(this.gun.damage, hit.hp + this.gun.damage),
+        });
         if (hit.hp <= 0) {
           this.kills++;
           hit.deathTime = this.elapsed;
-          this.fx({ type: 'death', from: hit });
+          this.fx({
+            type: 'death',
+            from: { x: hit.x, z: hit.z },
+            enemyId: hit.id,
+          });
           this.loot.push({
             id: 'enemy-' + hit.id,
             x: hit.x,

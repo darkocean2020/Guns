@@ -2,6 +2,7 @@ import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { CombatEffects, weaponFeel } from './combat-effects';
 import { Raid, type Level, type Profile, type FX } from './simulation';
 export class Engine {
   renderer: T.WebGLRenderer;
@@ -24,7 +25,13 @@ export class Engine {
   gunCache = new Map<string, T.Group>();
   held = new T.Group();
   selected = 'glock';
-  effects: { object: T.Object3D; life: number }[] = [];
+  combat: CombatEffects;
+  cameraShake = new T.Vector3();
+  motionScale = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 0
+    : 1;
+  audioBus: DynamicsCompressorNode | null = null;
+  noise: AudioBuffer | null = null;
   markers = new Map<string, T.Mesh>();
   audio: AudioContext | null = null;
   resizeObserver: ResizeObserver;
@@ -48,6 +55,7 @@ export class Engine {
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.25;
     host.appendChild(this.renderer.domElement);
+    this.combat = new CombatEffects(this.scene, host);
     this.scene.background = new T.Color('#172f3b');
     this.scene.fog = new T.FogExp2('#203c48', 0.006);
     const pm = new T.PMREMGenerator(this.renderer);
@@ -260,17 +268,26 @@ export class Engine {
   start() {
     if (!this.ready || !this.raid.start(this.selected)) return;
     this.unlockAudio();
+    this.combat.clear();
     this.keys.clear();
     this.mouse = false;
-    for (const e of this.enemies) this.scene.remove(e);
+    for (const e of this.enemies) {
+      e.traverse((o) => {
+        if (o instanceof T.Mesh && o.userData.originalEmission)
+          o.material.dispose();
+      });
+      this.scene.remove(e);
+    }
     this.enemies = this.raid.enemies.map(() => {
       const bird = this.character.clone(true);
       bird.traverse((o) => {
         if (o instanceof T.Mesh) {
           o.castShadow = true;
-          if (o.material.name.includes('vest')) {
-            o.material = o.material.clone();
-            o.material.color.set(0x96533d);
+          o.material = o.material.clone();
+          if (o.material.name.includes('vest')) o.material.color.set(0x96533d);
+          if (o.material instanceof T.MeshStandardMaterial) {
+            o.userData.originalEmission = o.material.emissive.clone();
+            o.userData.originalIntensity = o.material.emissiveIntensity;
           }
         }
       });
@@ -286,6 +303,7 @@ export class Engine {
   }
   menu() {
     this.raid.mode = 'menu';
+    this.combat.clear();
     this.keys.clear();
     this.mouse = false;
     this.refresh();
@@ -295,67 +313,141 @@ export class Engine {
     this.unlockAudio();
   }
   unlockAudio() {
-    if (!this.audio) this.audio = new AudioContext();
+    if (!this.audio) {
+      this.audio = new AudioContext();
+      this.audioBus = this.audio.createDynamicsCompressor();
+      this.audioBus.threshold.value = -12;
+      this.audioBus.ratio.value = 6;
+      this.audioBus.attack.value = 0.003;
+      this.audioBus.release.value = 0.18;
+      this.audioBus.connect(this.audio.destination);
+      this.noise = this.audio.createBuffer(
+        1,
+        this.audio.sampleRate * 0.6,
+        this.audio.sampleRate,
+      );
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
     void this.audio.resume();
   }
-  sound(type: string) {
-    if (this.muted || !this.audio) return;
+  sound(e: FX) {
+    if (
+      this.muted ||
+      !this.audio ||
+      !this.audioBus ||
+      e.primary === false ||
+      e.type === 'impact'
+    )
+      return;
     const ctx = this.audio,
-      osc = ctx.createOscillator(),
-      gain = ctx.createGain();
-    osc.type = type.includes('shot') ? 'sawtooth' : 'sine';
-    const freq =
-      type === 'loot' ? 720 : type === 'heal' ? 520 : type === 'hit' ? 170 : 95;
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      now = ctx.currentTime,
+      shot = e.type === 'shot' || e.type === 'enemy-shot';
+    const enemy = e.type === 'enemy-shot';
+    const feel =
+      weaponFeel[enemy ? 'glock' : this.raid.gun.id] ?? weaponFeel.glock;
+    const spatial = enemy
+      ? Math.max(
+          0.12,
+          1 -
+            Math.hypot(
+              e.from.x - this.raid.player.x,
+              e.from.z - this.raid.player.z,
+            ) /
+              26,
+        )
+      : 1;
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = enemy
+      ? T.MathUtils.clamp((e.from.x - this.raid.player.x) / 15, -0.8, 0.8)
+      : 0;
+    pan.connect(this.audioBus);
+    const osc = ctx.createOscillator(),
+      body = ctx.createGain();
+    osc.type = shot ? 'triangle' : 'sine';
+    const freq = shot
+      ? feel.bass
+      : e.type === 'death'
+        ? 880
+        : e.type === 'loot'
+          ? 720
+          : e.type === 'heal'
+            ? 520
+            : e.enemyId !== undefined
+              ? 1400
+              : 150;
+    const duration = shot ? feel.tail : e.type === 'death' ? 0.2 : 0.08;
+    osc.frequency.setValueAtTime(freq, now);
     osc.frequency.exponentialRampToValueAtTime(
-      freq * 0.3,
-      ctx.currentTime + 0.12,
+      shot ? 35 : freq * 0.6,
+      now + duration,
     );
-    gain.gain.setValueAtTime(
-      type.includes('shot') ? 0.07 : 0.035,
-      ctx.currentTime,
+    body.gain.setValueAtTime(0.001, now);
+    body.gain.linearRampToValueAtTime(
+      (shot ? 0.32 : 0.07) * spatial,
+      now + 0.003,
     );
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.16);
+    body.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc.connect(body).connect(pan);
+    osc.start(now);
+    osc.stop(now + duration + 0.015);
+    if (shot && this.noise) {
+      const noise = ctx.createBufferSource(),
+        filter = ctx.createBiquadFilter(),
+        crack = ctx.createGain();
+      noise.buffer = this.noise;
+      noise.playbackRate.value = 0.9 + Math.random() * 0.2;
+      filter.type = 'bandpass';
+      filter.frequency.value = enemy ? 1300 : feel.bass * 21;
+      filter.Q.value = 0.65;
+      crack.gain.setValueAtTime(0.001, now);
+      crack.gain.linearRampToValueAtTime(0.4 * spatial, now + 0.0015);
+      crack.gain.exponentialRampToValueAtTime(0.001, now + feel.tail * 0.65);
+      noise.connect(filter).connect(crack).connect(pan);
+      const delay = ctx.createDelay(0.2),
+        echo = ctx.createGain(),
+        low = ctx.createBiquadFilter();
+      delay.delayTime.value = 0.075;
+      echo.gain.value = 0.19;
+      low.type = 'lowpass';
+      low.frequency.value = 1100;
+      crack.connect(delay).connect(low).connect(echo).connect(pan);
+      noise.start(now, Math.random() * 0.1);
+      noise.stop(now + feel.tail);
+      noise.onended = () => {
+        noise.disconnect();
+        filter.disconnect();
+      };
+      osc.onended = () => {
+        osc.disconnect();
+        body.disconnect();
+      };
+      // Disconnect the short reflection after its tail, without accumulating audio nodes.
+      const cleanup = ctx.createOscillator(),
+        silent = ctx.createGain();
+      silent.gain.value = 0;
+      cleanup.connect(silent).connect(ctx.destination);
+      cleanup.start(now);
+      cleanup.stop(now + feel.tail + 0.21);
+      cleanup.onended = () => {
+        crack.disconnect();
+        delay.disconnect();
+        low.disconnect();
+        echo.disconnect();
+        pan.disconnect();
+        cleanup.disconnect();
+        silent.disconnect();
+      };
+    } else
+      osc.onended = () => {
+        osc.disconnect();
+        body.disconnect();
+        pan.disconnect();
+      };
   }
   fx(e: FX) {
-    this.sound(e.type);
-    if (e.to) {
-      const points = [
-        new T.Vector3(e.from.x, 0.9, e.from.z),
-        new T.Vector3(e.to.x, 0.9, e.to.z),
-      ];
-      const line = new T.Line(
-        new T.BufferGeometry().setFromPoints(points),
-        new T.LineBasicMaterial({
-          color: e.type === 'shot' ? 0xffe7a1 : 0xff7153,
-          transparent: true,
-          opacity: 0.9,
-        }),
-      );
-      this.scene.add(line);
-      this.effects.push({ object: line, life: 0.07 });
-    } else {
-      const ring = new T.Mesh(
-        new T.RingGeometry(0.2, 0.35, 20),
-        new T.MeshBasicMaterial({
-          color:
-            e.type === 'heal'
-              ? 0x83f7ca
-              : e.type === 'loot'
-                ? 0xf7d783
-                : 0xff654b,
-          transparent: true,
-          side: T.DoubleSide,
-        }),
-      );
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.set(e.from.x, 0.2, e.from.z);
-      this.scene.add(ring);
-      this.effects.push({ object: ring, life: 0.25 });
-    }
+    this.sound(e);
+    this.combat.event(e, this.raid.gun.id, this.raid.angle);
   }
   resize() {
     const w = this.host.clientWidth,
@@ -424,6 +516,7 @@ export class Engine {
     this.keys.delete(e.code);
   };
   aim() {
+    this.camera.updateMatrixWorld();
     const ray = new T.Raycaster();
     ray.setFromCamera(this.pointer, this.camera);
     ray.ray.intersectPlane(
@@ -442,6 +535,8 @@ export class Engine {
     const dt = Math.min((now - (this.last || now)) / 1000, 0.05);
     this.last = now;
     const r = this.raid;
+    this.camera.position.sub(this.cameraShake);
+    this.cameraShake.set(0, 0, 0);
     if (r) {
       this.aim();
       const input = {
@@ -453,6 +548,9 @@ export class Engine {
       if (this.mouse && r.gun.auto) r.shoot(this.target);
       this.player.position.set(r.player.x, 0, r.player.z);
       this.player.rotation.y = -r.angle;
+      this.held.position.z = -0.32 + this.combat.recoil * 0.12;
+      this.held.rotation.x = this.combat.recoil * 0.14;
+      this.held.rotation.z = -this.combat.recoil * 0.035;
       this.player.visible = r.mode !== 'menu';
       const walking = r.mode === 'raid' && (input.x !== 0 || input.z !== 0);
       this.player.traverse((o) => {
@@ -474,6 +572,21 @@ export class Engine {
         bird.position.set(e.x, e.hp > 0 ? 0 : 0.15, e.z);
         bird.rotation.set(e.hp > 0 ? 0 : Math.PI / 2, -e.angle, 0);
         bird.visible = r.mode !== 'menu';
+        const flash = this.combat.flashEnemies.has(e.id);
+        bird.traverse((o) => {
+          if (
+            o instanceof T.Mesh &&
+            o.material instanceof T.MeshStandardMaterial &&
+            o.userData.originalEmission
+          ) {
+            o.material.emissive.copy(
+              flash ? new T.Color(0xffd9a1) : o.userData.originalEmission,
+            );
+            o.material.emissiveIntensity = flash
+              ? 2
+              : o.userData.originalIntensity;
+          }
+        });
       });
       for (const c of r.loot) {
         let marker = this.markers.get(c.id);
@@ -499,6 +612,16 @@ export class Engine {
       const focus = menu
         ? new T.Vector3(1, 0, -3)
         : new T.Vector3(r.player.x, 0, r.player.z - 1);
+      if (r.mode === 'raid') {
+        const strength = this.combat.shake * 0.09 * this.motionScale;
+        this.cameraShake.set(
+          Math.sin(now * 0.083) * strength,
+          Math.cos(now * 0.067) * strength * 0.4,
+          Math.cos(now * 0.097) * strength * 0.65,
+        );
+        this.camera.position.add(this.cameraShake);
+        focus.add(this.cameraShake);
+      }
       this.camera.lookAt(focus);
       const size = menu ? 34 : 13;
       const aspect = this.host.clientWidth / this.host.clientHeight;
@@ -516,18 +639,12 @@ export class Engine {
         this.refresh();
       }
     }
-    for (let i = this.effects.length - 1; i >= 0; i--) {
-      const fx = this.effects[i];
-      fx.life -= dt;
-      if (fx.life <= 0) {
-        this.scene.remove(fx.object);
-        const o = fx.object as T.Mesh;
-        o.geometry.dispose();
-        (o.material as T.Material).dispose();
-        this.effects.splice(i, 1);
-      } else if (fx.object instanceof T.Mesh)
-        fx.object.scale.multiplyScalar(1 + dt * 3);
-    }
+    this.combat.update(
+      r?.mode === 'paused' ? 0 : dt,
+      this.camera,
+      this.pointer,
+      r?.mode === 'raid' || r?.mode === 'paused',
+    );
     this.renderer.render(this.scene, this.camera);
   };
   dispose() {
@@ -546,6 +663,7 @@ export class Engine {
       'pointerdown',
       this.pointerdown,
     );
+    this.combat.dispose();
     this.scene.traverse((o) => {
       if (o instanceof T.Mesh) {
         o.geometry.dispose();
