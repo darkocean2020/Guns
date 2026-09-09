@@ -1036,7 +1036,6 @@ export class Raid {
     }
     const moving =
       !this.openLoot &&
-      !this.inventory &&
       !this.mapOpen &&
       (input.x !== 0 || input.z !== 0);
     const sprint = moving && input.sprint && this.stamina > 1 && !this.healLeft;

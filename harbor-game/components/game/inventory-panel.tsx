@@ -329,7 +329,7 @@ export function InventoryPanel({
           </>
         ) : (
           <p className="inventory-tip">
-            点击物品查看操作，拖动整理 / 转移。
+            点击物品查看操作，拖动整理 / 转移。WASD 移动，Tab 关闭背包。
             <br />
             每件物品占 1 格；安全箱计入总负重。搜刮时战斗继续。
           </p>

@@ -113,6 +113,22 @@ assert.equal(r.transfer(0, 'secure', 'bag'), false);
 r.drop(0, 'secure');
 assert.equal(r.secure.length, 2, 'paused inventory cannot mutate');
 const b = fs.readFileSync('public/world/military-crate.glb');
+const walking = new Raid(level, profile, () => {}, () => {});
+walking.start('glock');
+walking.enemies = [];
+walking.inventory = true;
+const startX = walking.player.x;
+walking.update(0.05, { x: 1, z: 0, sprint: false });
+assert(walking.player.x > startX, 'open backpack permits walking');
+const walkDistance = walking.player.x - startX;
+const beforeSprint = walking.player.x;
+walking.update(0.05, { x: 1, z: 0, sprint: true });
+assert(walking.player.x - beforeSprint > walkDistance, 'open backpack permits sprinting');
+assert(walking.inventory, 'movement keeps backpack open');
+const beforePause = { ...walking.player };
+walking.mode = 'paused';
+walking.update(0.05, { x: 1, z: 0, sprint: true });
+assert.deepEqual(walking.player, beforePause, 'actual pause still stops movement');
 const g = await new GLTFLoader().parseAsync(
   b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength),
   '',
