@@ -45,3 +45,9 @@ Glock 免费；其他武器收取押金，成功撤离返还。带回清单另�
 敌人死亡后生成约 1.4 × 0.9 × 0.75 米的军用物资箱，带橄榄色箱体、加固框、搭扣、把手及 SUPPLY 04 标记。Blender 源文件为 `assets/harbor/MilitaryCrate.blend`，生成脚本为 `assets/harbor/build_military_crate.py`，运行时模型为 `assets/harbor/military-crate.glb`。
 
 新增测试验证 2 格容量、转移交换、总负重、安全物品死亡/超时保留、正常撤离奖励、重复结算防护和掉落箱模型尺寸。已检查 Blender 渲染图，未进行浏览器内拖放操作的人工验收。
+
+## 网页托管
+
+已部署至 https://harbor-zero-tokyo.sound-peach-2753.chatgpt.site ，当前访问范围为仅所有者。GitHub 仓库继续私有。朋友访问权限尚待授权设置。
+
+网页模型使用 `harbor-game/scripts/share_textures.py` 抽取共享贴图，不修改图像像素或几何。原始完整 GLB、Blender 源文件仍保留在 `assets/`。网站只包含运行所需资源，不包含 Blender 源文件。

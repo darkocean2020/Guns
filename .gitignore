@@ -9,3 +9,5 @@ harbor-game/.vinext/
 harbor-game/.wrangler/
 assets/harbor/*.blend1
 assets/harbor/*.blend2
+
+.deployment/
