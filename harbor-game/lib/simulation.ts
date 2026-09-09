@@ -1,5 +1,11 @@
-export type Point = { x: number; z: number };
-export type Rect = Point & { w: number; d: number; h: number; name: string };
+export type Point = { x: number; z: number; y?: number };
+export type Rect = Point & {
+  w: number;
+  d: number;
+  h: number;
+  name: string;
+  base?: number;
+};
 export type Level = {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   spawn: Point;
@@ -9,6 +15,54 @@ export type Level = {
   lights: (Point & { y: number })[];
   enemies: Point[];
 };
+
+export type BuildKind = 'wall' | 'floor' | 'stairs';
+export const blueprints = {
+  wall: { name: '木墙', wood: 6, scrap: 2, hp: 180 },
+  floor: { name: '架高地板', wood: 8, scrap: 2, hp: 220 },
+  stairs: { name: '楼梯', wood: 10, scrap: 3, hp: 180 },
+};
+export type BuildPiece = Point & {
+  id: number;
+  kind: BuildKind;
+  rotation: number;
+  base: number;
+  hp: number;
+};
+export type ResourcePile = Point & { id: number; remaining: number };
+export function buildRect(p: BuildPiece): Rect {
+  return {
+    x: p.x,
+    z: p.z,
+    w: p.kind === 'wall' ? (p.rotation % 2 ? 0.22 : 3) : 3,
+    d: p.kind === 'wall' ? (p.rotation % 2 ? 3 : 0.22) : 3,
+    h: p.kind === 'wall' ? 2.1 : 1.5,
+    base: p.base,
+    name: 'built-' + p.id,
+  };
+}
+export function surfaceHeight(p: Point, pieces: BuildPiece[]) {
+  let height = 0;
+  for (const b of pieces) {
+    if (
+      b.kind === 'wall' ||
+      Math.abs(p.x - b.x) > 1.5 ||
+      Math.abs(p.z - b.z) > 1.5
+    )
+      continue;
+    if (b.kind === 'floor') height = Math.max(height, 1.5);
+    else {
+      const a = (b.rotation * Math.PI) / 2,
+        localZ = Math.sin(a) * (p.x - b.x) + Math.cos(a) * (p.z - b.z);
+      height = Math.max(
+        height,
+        Math.max(0, Math.min(1.5, (1.5 - localZ) * 0.5)),
+      );
+    }
+  }
+  return height;
+}
+
 export const guns = [
   {
     id: 'glock',
@@ -239,6 +293,22 @@ export function segmentBlocked(a: Point, b: Point, rects: Rect[], pad = 0) {
       t1 = Math.min(t1, far);
       if (t0 > t1) return false;
     }
+    if (a.y !== undefined || b.y !== undefined) {
+      const start = (a.y ?? 0) + 0.9,
+        delta = (b.y ?? 0) - (a.y ?? 0),
+        bottom = r.base ?? 0,
+        top = bottom + r.h;
+      if (Math.abs(delta) < 1e-8) {
+        if (start < bottom || start > top) return false;
+      } else {
+        let near = (bottom - start) / delta,
+          far = (top - start) / delta;
+        if (near > far) [near, far] = [far, near];
+        t0 = Math.max(t0, near);
+        t1 = Math.min(t1, far);
+        if (t0 > t1) return false;
+      }
+    }
     return t1 >= 0 && t0 <= 1;
   });
 }
@@ -318,6 +388,15 @@ export class Raid {
   time = 480;
   elapsed = 0;
   kills = 0;
+  buildings: BuildPiece[] = [];
+  resources: ResourcePile[] = [];
+  wood = 36;
+  scrap = 16;
+  buildMode = false;
+  buildKind: BuildKind = 'wall';
+  buildRotation = 0;
+  buildTarget: Point = { x: 0, z: 0 };
+  buildSerial = 0;
   bag: Item[] = [];
   secure: Item[] = [];
   enemies: Enemy[] = [];
@@ -343,6 +422,192 @@ export class Raid {
     public persist: (p: Profile) => void = () => {},
   ) {
     this.player = { ...level.spawn };
+  }
+  get movementLevel(): Level {
+    return {
+      ...this.level,
+      colliders: [
+        ...this.level.colliders,
+        ...this.buildings.filter((b) => b.kind === 'wall').map(buildRect),
+      ],
+    };
+  }
+  get combatColliders() {
+    return [
+      ...this.level.colliders,
+      ...this.buildings.filter((b) => b.kind !== 'stairs').map(buildRect),
+    ];
+  }
+  get nearbyResource() {
+    return this.resources.find(
+      (p) =>
+        p.remaining > 0 &&
+        distance(p, this.player) < 2.3 &&
+        (this.player.y ?? 0) < 0.3 &&
+        !segmentBlocked(this.player, p, this.level.colliders),
+    );
+  }
+  get selectedBuilding() {
+    return this.buildings
+      .filter(
+        (b) =>
+          distance(b, this.buildTarget) < 1.8 && distance(b, this.player) < 7,
+      )
+      .sort(
+        (a, b) => distance(a, this.buildTarget) - distance(b, this.buildTarget),
+      )[0];
+  }
+  plan(
+    kind: BuildKind = this.buildKind,
+    target: Point = this.buildTarget,
+    rotation = this.buildRotation,
+  ): BuildPiece {
+    const x = Math.round(target.x / 3) * 3,
+      z = Math.round(target.z / 3) * 3;
+    return {
+      id: this.buildSerial,
+      kind,
+      x,
+      z,
+      rotation: ((rotation % 4) + 4) % 4,
+      base:
+        kind === 'wall' &&
+        this.buildings.some((b) => b.kind === 'floor' && b.x === x && b.z === z)
+          ? 1.5
+          : 0,
+      hp: blueprints[kind].hp,
+    };
+  }
+  buildReason(plan = this.plan()) {
+    if (this.mode !== 'raid') return '仅可在行动中建造';
+    if (this.buildings.length >= 40) return '已达到 40 个建筑上限';
+    if (distance(plan, this.player) > 7) return '超出建造距离（7 米）';
+    if (distance(plan, this.level.extraction) < 5) return '撤离区不能建造';
+    const r = buildRect(plan),
+      bounds = this.level.bounds;
+    if (
+      r.x - r.w / 2 < bounds.minX ||
+      r.x + r.w / 2 > bounds.maxX ||
+      r.z - r.d / 2 < bounds.minZ ||
+      r.z + r.d / 2 > bounds.maxZ
+    )
+      return '超出码头范围';
+    const overlap = (a: Rect, b: Rect) =>
+      Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 0.02 &&
+      Math.abs(a.z - b.z) < (a.d + b.d) / 2 - 0.02;
+    if (this.level.colliders.some((c) => overlap(r, c)))
+      return '与港区设施重叠';
+    if (
+      this.buildings.some(
+        (b) =>
+          overlap(r, buildRect(b)) &&
+          !(plan.kind === 'wall' && b.kind === 'floor'),
+      )
+    )
+      return '与现有建筑重叠';
+    if (this.loot.some((c) => c.items.length && inRect(c, r, 0.8)))
+      return '请避开物资箱';
+    if (this.resources.some((p) => p.remaining > 0 && inRect(p, r, 0.65)))
+      return '请避开材料堆';
+    if (
+      inRect(this.player, r, 0.5) ||
+      this.enemies.some((e) => e.hp > 0 && inRect(e, r, 0.5))
+    )
+      return '位置被角色占用';
+    const cost = blueprints[plan.kind];
+    if (this.wood < cost.wood || this.scrap < cost.scrap)
+      return '木料或废金属不足';
+    return '';
+  }
+  toggleBuild() {
+    if (this.mode !== 'raid') return;
+    this.buildMode = !this.buildMode;
+    this.closeInventory();
+    this.mapOpen = false;
+    this.search = null;
+    this.extracting = false;
+  }
+  chooseBuild(kind: BuildKind) {
+    if (!(kind in blueprints) || this.mode !== 'raid') return;
+    this.buildMode = true;
+    this.buildKind = kind;
+    this.closeInventory();
+    this.mapOpen = false;
+  }
+  rotateBuild() {
+    this.buildRotation = (this.buildRotation + 1) % 4;
+  }
+  placeBuild() {
+    if (!this.buildMode || this.inventory || this.openLoot || this.mapOpen)
+      return false;
+    const plan = this.plan(),
+      reason = this.buildReason(plan);
+    if (reason) {
+      this.notify(reason);
+      return false;
+    }
+    const cost = blueprints[plan.kind];
+    this.wood -= cost.wood;
+    this.scrap -= cost.scrap;
+    this.buildSerial++;
+    this.buildings.push(plan);
+    this.fx({ type: 'loot', from: plan });
+    this.notify('已建造' + cost.name);
+    return true;
+  }
+  demolish() {
+    if (this.mode !== 'raid' || !this.buildMode) return false;
+    const b = this.selectedBuilding;
+    if (!b) {
+      this.notify('指向 7 米内的建筑拆除');
+      return false;
+    }
+    if (
+      b.kind !== 'wall' &&
+      (inRect(this.player, buildRect(b), 0.45) ||
+        this.buildings.some(
+          (w) => w.kind === 'wall' && w.base > 0 && w.x === b.x && w.z === b.z,
+        ))
+    ) {
+      this.notify('先离开平台并拆掉上方墙体');
+      return false;
+    }
+    this.buildings = this.buildings.filter((p) => p.id !== b.id);
+    this.wood += Math.floor(blueprints[b.kind].wood / 2);
+    this.scrap += Math.floor(blueprints[b.kind].scrap / 2);
+    this.notify('建筑已拆除，返还一半材料');
+    return true;
+  }
+  damageBuilding(id: number, damage: number) {
+    const b = this.buildings.find((p) => p.id === id);
+    if (!b) return;
+    b.hp -= damage;
+    this.fx({ type: 'impact', from: { ...b, y: b.base }, surface: 'wood' });
+    if (b.hp <= 0) {
+      this.buildings = this.buildings.filter((p) => p.id !== id);
+      this.notify('木墙被摧毁');
+    }
+  }
+  movePlayer(dx: number, dz: number) {
+    let p = { ...this.player };
+    for (const [x, z] of [
+      [dx, 0],
+      [0, dz],
+    ]) {
+      const next = { ...p, x: p.x + x, z: p.z + z };
+      const h = surfaceHeight(next, this.buildings);
+      const level = {
+        ...this.movementLevel,
+        colliders: this.movementLevel.colliders.filter(
+          (c) => (c.base ?? 0) < Math.max(h, p.y ?? 0) + 1.3,
+        ),
+      };
+      if (!blocked(next, level) && h - (p.y ?? 0) < 0.3) {
+        p = next;
+        p.y = h;
+      }
+    }
+    return p;
   }
   get weight() {
     return [...this.bag, ...this.secure].reduce((sum, i) => sum + i.weight, 0);
@@ -386,7 +651,22 @@ export class Raid {
     this.gun = gun;
     this.profile.credits -= gun.cost;
     this.persist(this.profile);
-    this.player = { ...this.level.spawn };
+    this.player = { ...this.level.spawn, y: 0 };
+    this.buildings = [];
+    this.buildMode = false;
+    this.buildSerial = 0;
+    this.wood = 36;
+    this.scrap = 16;
+    this.buildRotation = 0;
+    this.buildKind = 'wall';
+    this.resources = [
+      [-22, 17],
+      [-12, 12],
+      [7, 17],
+      [-23, -4],
+      [0, -10],
+      [17, -23],
+    ].map(([x, z], id) => ({ id, x, z, remaining: 3 }));
     this.hp = 100;
     this.stamina = 100;
     this.ammo = gun.mag;
@@ -453,6 +733,16 @@ export class Raid {
       this.openLoot = null;
       return;
     }
+    if (!this.buildMode && this.nearbyResource) {
+      const pile = this.nearbyResource;
+      pile.remaining--;
+      this.wood += 12;
+      this.scrap += 5;
+      this.fx({ type: 'loot', from: pile });
+      this.notify('回收木料 +12 / 废金属 +5');
+      return;
+    }
+    if (this.buildMode) return;
     if (this.atExit) {
       this.extracting = true;
       this.extractProgress = 0;
@@ -570,6 +860,7 @@ export class Raid {
   shoot(target: Point) {
     if (
       this.mode !== 'raid' ||
+      this.buildMode ||
       this.shotCooldown > 0 ||
       this.reloadLeft > 0 ||
       this.healLeft > 0 ||
@@ -597,6 +888,7 @@ export class Raid {
       const end = {
         x: this.player.x + Math.sin(a) * this.gun.range,
         z: this.player.z - Math.cos(a) * this.gun.range,
+        y: this.player.y ?? 0,
       };
       let hit: Enemy | null = null;
       let nearest = this.gun.range;
@@ -610,15 +902,19 @@ export class Raid {
           along > 0 &&
           along < nearest &&
           side < 0.55 &&
-          !segmentBlocked(this.player, e, this.level.colliders)
+          !segmentBlocked(
+            { ...this.player, y: this.player.y ?? 0 },
+            { ...e, y: 0 },
+            this.combatColliders,
+          )
         ) {
           hit = e;
           nearest = along;
         }
       }
-      let dest = hit ? { x: hit.x, z: hit.z } : end;
+      let dest = hit ? { x: hit.x, z: hit.z, y: 0 } : end;
       const wall =
-        !hit && segmentBlocked(this.player, end, this.level.colliders);
+        !hit && segmentBlocked(this.player, end, this.combatColliders);
       if (wall) {
         let near = 0,
           far = 1;
@@ -627,13 +923,15 @@ export class Raid {
           const point = {
             x: this.player.x + (end.x - this.player.x) * t,
             z: this.player.z + (end.z - this.player.z) * t,
+            y: this.player.y ?? 0,
           };
-          if (segmentBlocked(this.player, point, this.level.colliders)) far = t;
+          if (segmentBlocked(this.player, point, this.combatColliders)) far = t;
           else near = t;
         }
         dest = {
           x: this.player.x + (end.x - this.player.x) * far,
           z: this.player.z + (end.z - this.player.z) * far,
+          y: this.player.y ?? 0,
         };
       }
       this.fx({
@@ -649,6 +947,12 @@ export class Raid {
           surface: this.level.colliders.find((r) => inRect(dest, r, 0.01))
             ?.name,
         });
+      if (wall) {
+        const structure = this.buildings.find(
+          (b) => b.kind === 'wall' && inRect(dest, buildRect(b), 0.02),
+        );
+        if (structure) this.damageBuilding(structure.id, this.gun.damage);
+      }
       if (hit) {
         hit.hp -= this.gun.damage;
         hit.alert = true;
@@ -705,6 +1009,7 @@ export class Raid {
     this.inventory = false;
     this.search = null;
     this.extracting = false;
+    this.buildMode = false;
     this.profile.raids++;
     this.profile.stash.push(...this.secure.map((i) => ({ ...i })));
     if (result === 'extracted') {
@@ -764,11 +1069,9 @@ export class Raid {
     if (moving) {
       const n = Math.hypot(input.x, input.z),
         speed = (sprint ? 6.2 : 3.6) * (this.healLeft ? 0.3 : 1);
-      this.player = move(
-        this.player,
+      this.player = this.movePlayer(
         (input.x / n) * dt * speed,
         (input.z / n) * dt * speed,
-        this.level,
       );
       this.search = null;
     }
@@ -800,7 +1103,12 @@ export class Raid {
       if (e.hp <= 0) continue;
       const dist = distance(e, this.player),
         sees =
-          dist < 13 && !segmentBlocked(e, this.player, this.level.colliders);
+          dist < 13 &&
+          !segmentBlocked(
+            { ...e, y: 0 },
+            { ...this.player, y: this.player.y ?? 0 },
+            this.combatColliders,
+          );
       e.cooldown -= dt;
       e.repath -= dt;
       e.memory = Math.max(0, e.memory - dt);
@@ -819,6 +1127,24 @@ export class Raid {
           if (this.elapsed > 4) this.damage(sprint ? 5 : 9);
         }
       } else e.alert = e.memory > 0;
+      if (!sees && dist < 12 && e.cooldown <= 0) {
+        const wall = this.buildings
+          .filter(
+            (b) =>
+              b.kind === 'wall' &&
+              segmentBlocked({ ...e, y: 0 }, this.player, [buildRect(b)]) &&
+              !segmentBlocked(e, b, this.level.colliders),
+          )
+          .sort((a, b) => distance(e, a) - distance(e, b))[0];
+        if (wall) {
+          e.alert = true;
+          e.memory = 5;
+          e.lastSeen = { ...this.player };
+          e.cooldown = 1.4;
+          this.fx({ type: 'enemy-shot', from: { x: e.x, z: e.z }, to: wall });
+          this.damageBuilding(wall.id, 22);
+        }
+      }
       const patrol = {
         x: e.home.x + Math.sin(this.elapsed * 0.2 + e.id) * 2,
         z: e.home.z + Math.cos(this.elapsed * 0.2 + e.id) * 2,
@@ -826,9 +1152,27 @@ export class Raid {
       const target = e.alert && e.lastSeen ? e.lastSeen : patrol;
       if (!(sees && dist < 8)) {
         let waypoint = target;
-        if (segmentBlocked(e, target, this.level.colliders, 0.4)) {
+        if (
+          segmentBlocked(
+            e,
+            target,
+            [
+              ...this.movementLevel.colliders,
+              ...this.buildings.filter((b) => b.kind !== 'wall').map(buildRect),
+            ],
+            0.4,
+          )
+        ) {
           if (e.repath <= 0) {
-            e.path = findPath(e, target, this.level);
+            e.path = findPath(e, target, {
+              ...this.movementLevel,
+              colliders: [
+                ...this.movementLevel.colliders,
+                ...this.buildings
+                  .filter((b) => b.kind !== 'wall')
+                  .map(buildRect),
+              ],
+            });
             e.repath = 0.8;
           }
           if (e.path.length && distance(e, e.path[0]) < 0.5) e.path.shift();
@@ -842,7 +1186,15 @@ export class Raid {
               e,
               ((waypoint.x - e.x) / d) * dt * speed,
               ((waypoint.z - e.z) / d) * dt * speed,
-              this.level,
+              {
+                ...this.movementLevel,
+                colliders: [
+                  ...this.movementLevel.colliders,
+                  ...this.buildings
+                    .filter((b) => b.kind !== 'wall')
+                    .map(buildRect),
+                ],
+              },
               0.38,
             );
           if (!sees) e.angle = Math.atan2(p.x - e.x, -(p.z - e.z));

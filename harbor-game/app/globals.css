@@ -1300,3 +1300,163 @@ kbd {
   align-items: center;
   gap: 5px;
 }
+.materials-hud {
+  position: absolute;
+  left: 28px;
+  top: 270px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #10272ce8;
+  padding: 10px 12px;
+  font-size: 10px;
+  border: 1px solid #c4dcc329;
+}
+.materials-hud > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #9eb49e;
+}
+.materials-hud b {
+  color: #f1cc99;
+  font-weight: 400;
+}
+.materials-hud button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-left: 1px solid #bfdbc32b;
+  padding-left: 10px;
+  color: #e4c49a;
+}
+.materials-hud button.active {
+  color: #9cffbd;
+}
+.build-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 57px;
+  transform: translateX(-50%);
+  width: 460px;
+  background: #10262bf5;
+  border: 1px solid #b4d8b744;
+  backdrop-filter: blur(14px);
+  padding: 15px;
+  z-index: 4;
+}
+.build-toolbar header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #dbc09a;
+  margin-bottom: 13px;
+}
+.build-toolbar header > span {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.build-toolbar small {
+  font-size: 9px;
+  color: #8da895;
+}
+.blueprint-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.blueprint-list button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  background: #203831;
+  border: 1px solid #b1cda62f;
+  padding: 13px 4px;
+  color: #bfd0b6;
+}
+.blueprint-list kbd {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  font-size: 8px;
+  padding: 2px 3px;
+}
+.blueprint-list strong {
+  font-size: 11px;
+  font-weight: 400;
+}
+.blueprint-list span {
+  font-size: 8px;
+  color: #9db095;
+}
+.blueprint-list .chosen {
+  border-color: #e7bd81;
+  background: #454431;
+  color: #ffe5bd;
+}
+.build-toolbar > p {
+  font-size: 10px;
+  margin: 12px 0;
+  text-align: center;
+}
+.build-toolbar .valid {
+  color: #a5e7b8;
+}
+.build-toolbar .invalid {
+  color: #f0a48b;
+}
+.build-toolbar footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 9px;
+  border-top: 1px solid #abc7ab25;
+  padding-top: 10px;
+  color: #a3b5a1;
+}
+.build-toolbar footer button {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.build-toolbar footer kbd {
+  font-size: 8px;
+  padding: 3px 4px;
+}
+.structure-health {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #c0d5ba;
+  margin: 10px 0;
+}
+.build-active .interaction {
+  bottom: 290px;
+}
+.build-active .ammo {
+  opacity: 0.4;
+}
+.build-active .combat-reticle {
+  color: #9bebae;
+}
+.build-active .raid-help {
+  opacity: 0;
+}
+@media (max-width: 1000px) {
+  .build-toolbar {
+    bottom: 135px;
+    width: 420px;
+  }
+  .build-active .interaction {
+    bottom: 375px;
+  }
+  .materials-hud {
+    left: 20px;
+    top: 270px;
+  }
+}

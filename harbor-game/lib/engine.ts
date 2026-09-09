@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CombatEffects, weaponFeel } from './combat-effects';
+import { ConstructionView } from './construction-view';
 import { Raid, type Level, type Profile, type FX } from './simulation';
 export class Engine {
   renderer: T.WebGLRenderer;
@@ -26,6 +27,7 @@ export class Engine {
   held = new T.Group();
   selected = 'glock';
   combat: CombatEffects;
+  construction: ConstructionView;
   cameraShake = new T.Vector3();
   motionScale = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     ? 0
@@ -58,6 +60,7 @@ export class Engine {
     this.renderer.toneMappingExposure = 1.25;
     host.appendChild(this.renderer.domElement);
     this.combat = new CombatEffects(this.scene, host);
+    this.construction = new ConstructionView(this.scene);
     this.scene.background = new T.Color('#172f3b');
     this.scene.fog = new T.FogExp2('#203c48', 0.006);
     const pm = new T.PMREMGenerator(this.renderer);
@@ -208,7 +211,12 @@ export class Engine {
       this.scene.add(mesh);
     }
     this.progress('装配保留的枪械模型');
-    await this.selectGun('glock');
+    await Promise.all([
+      this.selectGun('glock'),
+      this.construction.load(this.loader, (root, target) =>
+        this.batch(root, target),
+      ),
+    ]);
     this.ready = true;
     this.progress('');
     this.refresh();
@@ -280,6 +288,7 @@ export class Engine {
     if (!this.ready || !this.raid.start(this.selected)) return;
     this.unlockAudio();
     this.combat.clear();
+    this.construction.clear();
     this.keys.clear();
     this.mouse = false;
     for (const e of this.enemies) {
@@ -484,8 +493,14 @@ export class Engine {
     if (e.button !== 0 || !this.ready) return;
     this.pointermove(e);
     this.unlockAudio();
-    this.mouse = true;
     this.aim();
+    if (this.raid.buildMode) {
+      this.mouse = false;
+      this.raid.placeBuild();
+      this.refresh();
+      return;
+    }
+    this.mouse = true;
     this.raid.shoot(this.target);
   };
   pointerup = () => {
@@ -511,13 +526,28 @@ export class Engine {
       if (r.openLoot) r.openLoot = null;
       else if (r.inventory) r.inventory = false;
       else if (r.mapOpen) r.mapOpen = false;
+      else if (r.buildMode) r.buildMode = false;
       else r.togglePause();
     }
     if (r.mode === 'raid') {
       if (e.code === 'KeyE') r.interact();
-      if (e.code === 'KeyR') r.reload();
+      if (e.code === 'KeyR') {
+        if (r.buildMode) r.rotateBuild();
+        else r.reload();
+      }
+      if (e.code === 'KeyB') {
+        r.toggleBuild();
+        this.mouse = false;
+      }
+      if (r.buildMode) {
+        if (e.code === 'Digit1') r.chooseBuild('wall');
+        if (e.code === 'Digit2') r.chooseBuild('floor');
+        if (e.code === 'Digit3') r.chooseBuild('stairs');
+        if (e.code === 'KeyX') r.demolish();
+      }
       if (e.code === 'KeyH') r.heal();
       if (e.code === 'Tab') {
+        r.buildMode = false;
         r.inventory = !r.inventory;
         r.openLoot = null;
       }
@@ -533,9 +563,11 @@ export class Engine {
     const ray = new T.Raycaster();
     ray.setFromCamera(this.pointer, this.camera);
     ray.ray.intersectPlane(
-      new T.Plane(new T.Vector3(0, 1, 0), -0.8),
+      new T.Plane(new T.Vector3(0, 1, 0), this.raid?.buildMode ? 0 : -0.8),
       this.target,
     );
+    if (this.raid)
+      this.raid.buildTarget = { x: this.target.x, z: this.target.z };
     if (this.raid?.mode === 'raid')
       this.raid.angle = Math.atan2(
         this.target.x - this.raid.player.x,
@@ -559,7 +591,7 @@ export class Engine {
       };
       r.update(dt, input);
       if (this.mouse && r.gun.auto) r.shoot(this.target);
-      this.player.position.set(r.player.x, 0, r.player.z);
+      this.player.position.set(r.player.x, r.player.y ?? 0, r.player.z);
       this.player.rotation.y = -r.angle;
       this.held.position.z = -0.32 + this.combat.recoil * 0.12;
       this.held.rotation.x = this.combat.recoil * 0.14;
@@ -636,11 +668,11 @@ export class Engine {
       const menu = r.mode === 'menu';
       const desired = menu
         ? new T.Vector3(27, 43, 40)
-        : new T.Vector3(r.player.x, 24, r.player.z + 20);
+        : new T.Vector3(r.player.x, 24 + (r.player.y ?? 0), r.player.z + 20);
       this.camera.position.lerp(desired, 1 - Math.exp(-dt * 5));
       const focus = menu
         ? new T.Vector3(1, 0, -3)
-        : new T.Vector3(r.player.x, 0, r.player.z - 1);
+        : new T.Vector3(r.player.x, r.player.y ?? 0, r.player.z - 1);
       if (r.mode === 'raid') {
         const strength = this.combat.shake * 0.09 * this.motionScale;
         this.cameraShake.set(
@@ -662,6 +694,7 @@ export class Engine {
       if (this.exit)
         (this.exit.material as T.MeshBasicMaterial).opacity =
           0.65 + Math.sin(now * 0.003) * 0.3;
+      this.construction.update(r);
       this.tick += dt;
       if (this.tick > 0.09) {
         this.tick = 0;
@@ -693,6 +726,7 @@ export class Engine {
       this.pointerdown,
     );
     this.combat.dispose();
+    this.construction.dispose();
     this.scene.traverse((o) => {
       if (o instanceof T.Mesh) {
         o.geometry.dispose();

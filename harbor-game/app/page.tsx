@@ -25,8 +25,9 @@ import {
 } from '@/components/ui/dialog';
 import { Engine } from '@/lib/engine';
 import { InventoryPanel } from '@/components/game/inventory-panel';
+import { BuildHud } from '@/components/game/build-hud';
 import { registerHarborTools } from '@/lib/webmcp';
-import { guns, distance, type Raid } from '@/lib/simulation';
+import { guns, distance, buildRect, type Raid } from '@/lib/simulation';
 const money = (n: number) => '¥ ' + n.toLocaleString('en-US');
 function MapView({ raid, large = false }: { raid: Raid; large?: boolean }) {
   const l = raid.level;
@@ -49,6 +50,21 @@ function MapView({ raid, large = false }: { raid: Raid; large?: boolean }) {
           opacity=".75"
         />
       ))}
+      {raid.buildings.map((piece) => {
+        const c = buildRect(piece);
+        return (
+          <rect
+            key={'build' + piece.id}
+            x={c.x - c.w / 2}
+            y={c.z - c.d / 2}
+            width={c.w}
+            height={c.d}
+            fill="#e7b777"
+            stroke="#ffd9a4"
+            strokeWidth=".15"
+          />
+        );
+      })}
       <circle cx="7" cy="-16" r="1.1" fill="#ffba6a" />
       <circle
         cx={l.extraction.x}
@@ -127,13 +143,16 @@ export default function Home() {
     f();
     refresh();
   };
-  const prompt = r?.atExit
-    ? '呼叫撤离快艇'
-    : r?.nearby
-      ? r.nearby.searched
-        ? '打开补给箱'
-        : '搜索补给箱'
-      : '';
+  const prompt =
+    r?.nearbyResource && !r.buildMode
+      ? '回收木料 +12 / 废金属 +5'
+      : r?.atExit
+        ? '呼叫撤离快艇'
+        : r?.nearby
+          ? r.nearby.searched
+            ? '打开补给箱'
+            : '搜索补给箱'
+          : '';
   const progress = r?.search
     ? r.search.progress / 1.2
     : r?.extracting
@@ -144,7 +163,13 @@ export default function Home() {
           ? 1 - r.reloadLeft / r.gun.reload
           : 0;
   return (
-    <main className={menu ? 'game menu-mode' : 'game raid-mode'}>
+    <main
+      className={
+        menu
+          ? 'game menu-mode'
+          : 'game raid-mode' + (r?.buildMode ? ' build-active' : '')
+      }
+    >
       <div ref={host} className="world" />
       {menu && <div className="menu-shade" />}
       <header className="topbar">
@@ -335,6 +360,9 @@ export default function Home() {
             <span>
               <kbd>Tab</kbd> 背包
             </span>
+            <span>
+              <kbd>B</kbd> 建造
+            </span>
           </footer>
         </>
       )}
@@ -399,6 +427,7 @@ export default function Home() {
               {Math.round(distance(r.player, r.level.extraction))} m
             </div>
           </aside>
+          <BuildHud raid={r} refresh={refresh} />
           <div className="ammo">
             <Crosshair size={20} />
             <div>
@@ -444,7 +473,7 @@ export default function Home() {
                   <i style={{ width: progress * 100 + '%' }} />
                 </div>
               </div>
-            ) : prompt && !r.openLoot && !r.inventory ? (
+            ) : prompt && !r.openLoot && !r.inventory && !r.buildMode ? (
               <button onClick={() => action(() => r.interact())}>
                 <kbd>E</kbd>
                 {prompt}

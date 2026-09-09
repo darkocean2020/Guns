@@ -203,8 +203,8 @@ export class CombatEffects {
     const direction = new T.Vector3(e.to.x - e.from.x, 0, e.to.z - e.from.z),
       length = direction.length();
     direction.normalize();
-    const from = new T.Vector3(e.from.x, 0.95, e.from.z),
-      to = new T.Vector3(e.to.x, 0.95, e.to.z);
+    const from = new T.Vector3(e.from.x, 0.95 + (e.from.y ?? 0), e.from.z),
+      to = new T.Vector3(e.to.x, 0.95 + (e.to.y ?? 0), e.to.z);
     const muzzle = from
       .clone()
       .addScaledVector(
@@ -290,7 +290,7 @@ export class CombatEffects {
       this.shot(e, id, angle);
       return;
     }
-    const p = new T.Vector3(e.from.x, 0.9, e.from.z);
+    const p = new T.Vector3(e.from.x, 0.9 + (e.from.y ?? 0), e.from.z);
     if (e.type === 'impact') {
       const metal = ['container', 'drums'].includes(e.surface ?? '');
       this.burst(p, metal ? 11 : 6, metal ? 0xffc873 : 0xb9c2b5, metal ? 5 : 3);
