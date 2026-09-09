@@ -1460,3 +1460,52 @@ kbd {
     top: 270px;
   }
 }
+
+.field-actions-hud {
+  position: absolute;
+  left: 28px;
+  top: 270px;
+  z-index: 2;
+}
+.field-actions-hud .materials-hud {
+  position: static;
+}
+.medkit-hud {
+  margin-top: 7px;
+  padding: 10px 12px;
+  background: #10272ce8;
+  border: 1px solid #c4dcc329;
+}
+.medkit-hud button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 0;
+  color: #b7d9bd;
+  font-size: 11px;
+}
+.medkit-hud button span {
+  flex: 1;
+  text-align: left;
+}
+.medkit-hud button b {
+  font-weight: 400;
+  margin-left: 5px;
+  color: #edcf9d;
+}
+.medkit-hud p {
+  font-size: 10px;
+  color: #b4c7b4;
+  margin: 8px 0 4px;
+}
+.medkit-hud small {
+  display: block;
+  font-size: 9px;
+  color: #8ea595;
+}
+@media (max-width: 1000px) {
+  .field-actions-hud {
+    left: 20px;
+  }
+}

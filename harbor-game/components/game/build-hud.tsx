@@ -8,6 +8,7 @@ import {
   Axe,
   TreePine,
   Anvil,
+  HeartPulse,
 } from 'lucide-react';
 import { blueprints, type BuildKind, type Raid } from '@/lib/simulation';
 export function BuildHud({
@@ -24,20 +25,42 @@ export function BuildHud({
   };
   return (
     <>
-      <div className="materials-hud">
-        <span>
-          <TreePine size={15} /> 木料 <b>{r.wood}</b>
-        </span>
-        <span>
-          <Anvil size={15} /> 金属 <b>{r.scrap}</b>
-        </span>
-        <button
-          className={r.buildMode ? 'active' : ''}
-          onClick={() => act(() => r.toggleBuild())}
-        >
-          <Hammer size={15} />
-          <kbd>B</kbd>
-        </button>
+      <div className="field-actions-hud">
+        <div className="materials-hud">
+          <span>
+            <TreePine size={15} /> 木料 <b>{r.wood}</b>
+          </span>
+          <span>
+            <Anvil size={15} /> 金属 <b>{r.scrap}</b>
+          </span>
+          <button
+            className={r.buildMode ? 'active' : ''}
+            onClick={() => act(() => r.toggleBuild())}
+          >
+            <Hammer size={15} />
+            <kbd>B</kbd>
+          </button>
+        </div>
+        <div className="medkit-hud">
+          <button
+            aria-label="使用急救包（H）"
+            disabled={
+              r.mode !== 'raid' ||
+              r.hp >= 100 ||
+              r.medkits === 0 ||
+              r.healLeft > 0
+            }
+            onClick={() => act(() => r.heal())}
+          >
+            <HeartPulse size={16} />
+            <span>
+              {r.healLeft > 0 ? '正在包扎…' : '急救包'} <b>× {r.medkits}</b>
+            </span>
+            <kbd>H</kbd>
+          </button>
+          <p>包扎 2 秒 · 恢复 55 点生命</p>
+          <small>受击会中断，未完成不消耗</small>
+        </div>
       </div>
       {r.buildMode && (
         <section className="build-toolbar">
